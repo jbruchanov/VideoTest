@@ -14,8 +14,7 @@ import si.virag.AndroidOpenGLVideoDemo.gl.VideoTextureRenderer;
 
 import java.io.IOException;
 
-public class SurfaceActivity extends Activity implements TextureView.SurfaceTextureListener
-{
+public class SurfaceActivity extends Activity implements TextureView.SurfaceTextureListener {
     private static final String LOG_TAG = "SurfaceTest";
 
     private TextureView surface;
@@ -26,8 +25,7 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
     private int surfaceHeight;
 
     @Override
-    public void onCreate(Bundle savedInstanceState)
-    {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
@@ -38,16 +36,14 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
     }
 
     @Override
-    protected void onResume()
-    {
+    protected void onResume() {
         super.onResume();
         if (surface.isAvailable())
             startPlaying();
     }
 
     @Override
-    protected void onPause()
-    {
+    protected void onPause() {
         super.onPause();
         if (player != null)
             player.release();
@@ -55,13 +51,20 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
             renderer.onPause();
     }
 
-    private void startPlaying()
-    {
+    private void startPlaying() {
+        surface.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                startPlayingImpl();
+            }
+        }, 1000);
+    }
+
+    private void startPlayingImpl() {
         renderer = new VideoTextureRenderer(this, surface.getSurfaceTexture(), surfaceWidth, surfaceHeight);
         player = new MediaPlayer();
 
-        try
-        {
+        try {
 //            AssetFileDescriptor afd = getAssets().openFd("big_buck_bunny.mp4");
             AssetFileDescriptor afd = getAssets().openFd("sync_party_setup_welcome.mp4");
             player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
@@ -70,37 +73,32 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
             player.prepare();
             renderer.setVideoSize(player.getVideoWidth(), player.getVideoHeight());
             player.start();
-
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Could not open input video!");
+        } catch (Throwable e) {
+            e.printStackTrace();
+            startPlaying();
+            //throw new RuntimeException("Could not open input video!");
         }
     }
 
     @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height)
-    {
+    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         surfaceWidth = width;
         surfaceHeight = height;
         startPlaying();
     }
 
     @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height)
-    {
+    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
         //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface)
-    {
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
         return false;  //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface)
-    {
+    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
         //To change body of implemented methods use File | Settings | File Templates.
     }
 }
