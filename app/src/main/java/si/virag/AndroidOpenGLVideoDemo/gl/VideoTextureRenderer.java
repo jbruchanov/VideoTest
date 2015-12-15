@@ -11,10 +11,12 @@ import android.util.Log;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 public class VideoTextureRenderer extends TextureSurfaceRenderer implements SurfaceTexture.OnFrameAvailableListener
 {
+    /*
     private static final String vertexShaderCode =
                     "attribute vec4 vPosition;" +
                     "attribute vec4 vTexCoordinate;" +
@@ -34,34 +36,29 @@ public class VideoTextureRenderer extends TextureSurfaceRenderer implements Surf
                     "    vec4 color = texture2D(texture, v_TexCoordinate);" +
                     "    gl_FragColor = color;" +
                     "}";
+*/
+    private static final String vertexShaderCode =
+                    "attribute vec4 a_position;" +
+                    "attribute vec2 a_texCoord;" +
+                    "uniform mat4 u_MVPMatrix;" +
+                    "varying vec2 v_texCoord1;" +
+                    "varying vec2 v_texCoord2;" +
+                    "void main() {" +
+                    "   gl_Position = a_position;" +
+                    "   v_texCoord1 = vec2(a_texCoord.x/2.0, a_texCoord.y);" +
+                    "   v_texCoord2 = vec2(a_texCoord.x/2.0+0.5, a_texCoord.y);" +
+                    "}";
 
-//    private static final String vertexShaderCode =
-//                    "attribute vec4 a_position;" +
-//                    "attribute vec2 a_texCoord;" +
-//                    "uniform mat4 u_MVPMatrix;" +
-//                    "uniform vec4 u_MasterColor;" +
-//                    "varying lowp vec4 v_fragmentColor;" +
-//                    "varying mediump vec2 v_texCoord1;" +
-//                    "varying mediump vec2 v_texCoord2;" +
-//                    "void main() {" +
-//                    "   gl_Position = u_MVPMatrix * a_position;" +
-//                    "   v_texCoord1 = vec2(a_texCoord.x/2.0, a_texCoord.y);" +
-//                    "   v_texCoord2 = vec2(a_texCoord.x/2.0+0.5, a_texCoord.y);" +
-//                    "   v_fragmentColor = u_MasterColor;" +
-//                    "}";
-////
-//    private static final String fragmentShaderCode =
-//        "#extension GL_OES_EGL_image_external : require" +
-//            "varying vec2 v_texCoord1;" +
-//            "varying vec2 v_texCoord2;" +
-//            "uniform samplerExternalOES u_texture;" +
-//            "varying vec4 v_fragmentColor;" +
-//            "void main()" +
-//            "{" +
-//            "    lowp vec3 rgb = texture2D(u_texture, v_texCoord1).rgb;" +
-//            "    lowp float alpha = texture2D(u_texture, v_texCoord2).r;" +
-//            "    gl_FragColor = vec4(rgb, alpha) * v_fragmentColor;" +
-//            "}";
+    private static final String fragmentShaderCode =
+            "#extension GL_OES_EGL_image_external : require\n" +
+            "varying mediump vec2 v_texCoord1;" +
+            "varying mediump vec2 v_texCoord2;" +
+            "uniform samplerExternalOES u_texture;" +
+            "void main() {" +
+            "    lowp vec3 rgb = texture2D(u_texture, v_texCoord1).rgb;" +
+            "    lowp float alpha = texture2D(u_texture, v_texCoord2).r;" +
+            "    gl_FragColor = vec4(rgb, alpha);" +
+            "}";
 
 
     private static float squareSize = .5f;
@@ -76,10 +73,10 @@ public class VideoTextureRenderer extends TextureSurfaceRenderer implements Surf
 
     // Texture to be shown in backgrund
     private FloatBuffer textureBuffer;
-    private static float textureCoords[] = { 0.0f, 1.0f, 0.0f, 1.0f,
-                                      0.0f, 0.0f, 0.0f, 1.0f,
-                                      1.0f, 0.0f, 0.0f, 1.0f,
-                                      1.0f, 1.0f, 0.0f, 1.0f };
+    private static float textureCoords[] = { 0.0f, 0.0f, 0.0f, 1.0f,
+                                            0.0f, 1.0f, 0.0f, 1.0f,
+                                            1.0f, 1.0f, 0.0f, 1.0f,
+                                            1.0f, 0.0f, 0.0f, 1.0f };
     private int[] textures = new int[1];
 
     private int vertexShaderHandle;
@@ -113,6 +110,16 @@ public class VideoTextureRenderer extends TextureSurfaceRenderer implements Surf
         fragmentShaderHandle = GLES20.glCreateShader(GLES20.GL_FRAGMENT_SHADER);
         GLES20.glShaderSource(fragmentShaderHandle, fragmentShaderCode);
         GLES20.glCompileShader(fragmentShaderHandle);
+
+        int[] compiled = new int[1];
+        GLES20.glGetShaderiv(fragmentShaderHandle, GLES20.GL_COMPILE_STATUS, compiled, 0);
+        if (compiled[0] == 0) {
+            Log.e("SurfaceTest", "Could not compile shader " + ":");
+            Log.e("SurfaceTest", GLES20.glGetShaderInfoLog(fragmentShaderHandle));
+            GLES20.glDeleteShader(fragmentShaderHandle);
+            return;
+        }
+
         checkGlError("Pixel shader compile");
 
         shaderProgram = GLES20.glCreateProgram();
@@ -125,6 +132,7 @@ public class VideoTextureRenderer extends TextureSurfaceRenderer implements Surf
         GLES20.glGetProgramiv(shaderProgram, GLES20.GL_LINK_STATUS, status, 0);
         if (status[0] != GLES20.GL_TRUE) {
             String error = GLES20.glGetProgramInfoLog(shaderProgram);
+
             Log.e("SurfaceTest", "Error while linking program:\n" + error);
         }
 
@@ -195,12 +203,17 @@ public class VideoTextureRenderer extends TextureSurfaceRenderer implements Surf
         GLES20.glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
+
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+
         // Draw texture
         GLES20.glUseProgram(shaderProgram);
-        int textureParamHandle = GLES20.glGetUniformLocation(shaderProgram, "texture");
-        int textureCoordinateHandle = GLES20.glGetAttribLocation(shaderProgram, "vTexCoordinate");
-        int positionHandle = GLES20.glGetAttribLocation(shaderProgram, "vPosition");
-        int textureTranformHandle = GLES20.glGetUniformLocation(shaderProgram, "textureTransform");
+        int textureParamHandle = GLES20.glGetUniformLocation(shaderProgram, "u_texture");
+        int textureCoordinateHandle = GLES20.glGetAttribLocation(shaderProgram, "a_texCoord");
+        int positionHandle = GLES20.glGetAttribLocation(shaderProgram, "a_position");
+        int textureTranformHandle = GLES20.glGetUniformLocation(shaderProgram, "u_MVPMatrix");
+
 
         GLES20.glEnableVertexAttribArray(positionHandle);
         GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 4 * 3, vertexBuffer);
