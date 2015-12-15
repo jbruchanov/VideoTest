@@ -5,19 +5,20 @@ import android.content.res.AssetFileDescriptor;
 import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 
 import com.smallplanet.videoplayer.R;
 
-import java.io.IOException;
-
 import si.virag.AndroidOpenGLVideoDemo.gl.VideoTextureRenderer;
+
+import java.io.IOException;
 
 public class SurfaceActivity extends Activity implements TextureView.SurfaceTextureListener {
     private static final String LOG_TAG = "SurfaceTest";
 
-    private TextureView mTextureView;
+    private TextureView surface;
     private MediaPlayer player;
     private VideoTextureRenderer renderer;
 
@@ -29,17 +30,17 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        mTextureView = (TextureView) findViewById(R.id.surface);
-        mTextureView.setSurfaceTextureListener(this);
-//        mTextureView.setScaleX(0.5f);
-//        mTextureView.setScaleY(0.5f);
+        surface = (TextureView) findViewById(R.id.surface);
+        surface.setSurfaceTextureListener(this);
+//        surface.setScaleX(0.5f);
+//        surface.setScaleY(0.5f);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (mTextureView.isAvailable())
-            startPlayingImpl(mTextureView.getSurfaceTexture());
+        if (surface.isAvailable())
+            startPlaying();
     }
 
     @Override
@@ -47,33 +48,53 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
         super.onPause();
         if (player != null)
             player.release();
-        if (renderer != null)
+        if (renderer != null) {
             renderer.onPause();
+        }
     }
 
-    private void startPlayingImpl(SurfaceTexture sf) {
-        renderer = new VideoTextureRenderer(this, sf, surfaceWidth, surfaceHeight);
+    private void startPlaying() {
+        surface.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                startPlayingImpl();
+            }
+        }, 1000);
+    }
+
+    private void startPlayingImpl() {
+        if (surface.getSurfaceTexture() == null) {
+            startPlaying();
+            return;
+        }
+        renderer = new VideoTextureRenderer(this, surface.getSurfaceTexture(), surfaceWidth, surfaceHeight);
+        renderer.start(null);
+        while (renderer.getVideoTexture() == null) {
+            try {
+                synchronized (renderer) {
+                    Log.d("Renderer", "Waiting because of renderer.getVideoTexture() ");
+                    renderer.wait(100);
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         player = new MediaPlayer();
 
         try {
 //            AssetFileDescriptor afd = getAssets().openFd("big_buck_bunny.mp4");
             AssetFileDescriptor afd = getAssets().openFd("sync_party_setup_welcome.mp4");
             player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-            renderer.start(new Runnable() {
+            player.setSurface(new Surface(renderer.getVideoTexture()));
+            player.setLooping(true);
+            player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override
-                public void run() {
-                    player.setSurface(new Surface(renderer.getVideoTexture()));
-                    player.setLooping(true);
-                    try {
-                        renderer.setVideoSize(player.getVideoWidth(), player.getVideoHeight());
-                        player.prepare();
-                        player.start();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        throw new RuntimeException("Could not open input video!");
-                    }
+                public void onPrepared(MediaPlayer mp) {
+                    renderer.setVideoSize(mp.getVideoWidth(), mp.getVideoHeight());
+                    mp.start();
                 }
             });
+            player.prepareAsync();
         } catch (Throwable e) {
             e.printStackTrace();
             throw new RuntimeException("Could not open input video!");
@@ -84,7 +105,7 @@ public class SurfaceActivity extends Activity implements TextureView.SurfaceText
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         surfaceWidth = width;
         surfaceHeight = height;
-        startPlayingImpl(surface);
+        startPlaying();
     }
 
     @Override
