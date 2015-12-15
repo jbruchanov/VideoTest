@@ -76,7 +76,7 @@ public class VideoTextureRenderer extends TextureSurfaceRenderer implements Surf
 
     // Texture to be shown in backgrund
     private FloatBuffer textureBuffer;
-    private float textureCoords[] = { 0.0f, 1.0f, 0.0f, 1.0f,
+    private static float textureCoords[] = { 0.0f, 1.0f, 0.0f, 1.0f,
                                       0.0f, 0.0f, 0.0f, 1.0f,
                                       1.0f, 0.0f, 0.0f, 1.0f,
                                       1.0f, 1.0f, 0.0f, 1.0f };

@@ -37,6 +37,11 @@ public abstract class TextureSurfaceRenderer implements Runnable
         this.width = width;
         this.height = height;
         this.running = true;
+    }
+
+    private volatile Runnable mDoneCallback;
+    public void start(Runnable onInitDoneCallback) {
+        mDoneCallback = onInitDoneCallback;
         Thread thrd = new Thread(this);
         thrd.start();
     }
@@ -47,6 +52,9 @@ public abstract class TextureSurfaceRenderer implements Runnable
         initGL();
         initGLComponents();
         Log.d(LOG_TAG, "OpenGL init OK.");
+        if (mDoneCallback != null) {
+            mDoneCallback.run();
+        }
 
         while (running)
         {
